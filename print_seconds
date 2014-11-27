@@ -1,0 +1,23 @@
+//prints seconds using time.h
+
+#include "Time.h"
+
+time_t tm;
+
+void setup()
+{
+  
+    Serial.begin(9600);
+    while (!Serial) 
+    {
+    ;
+  }
+
+}
+
+void loop() 
+{
+  tm=now();
+Serial.println(tm);
+delay(1000);
+}
