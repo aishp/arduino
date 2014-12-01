@@ -1,7 +1,3 @@
-// does not work
-//accept curl PORT msg from MAC and parse HTTP message in arduino to install report
-//curl message: curl -X POST -H "Content-Type:application/json" -d @sample.json http://192.168.1.34
-
 
 //lcd Ywrobot Arduino lcm1602 iic v1
 //Connect GND, VCC, SDA and SCL from lcd to corresponding pins on arduino (only these pins need to be connected)
@@ -35,23 +31,25 @@ struct report_record
     String uuid;
     String ReportResource;
     String *ReportDeliveryLocations;
+    String user_agent;
     int MinPeriod;
     int MaxPeriod;
     int ExpireTime;
     int del_num;
-    
-    int timer_value;
-    int max_value;
-    int exp_value;
     float temp_record;
 };
 
-char report[200];
+
+struct report_record record[5]; //storing more records hangs
+
+char report[400];
 int ch=0;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 time_t tm;
 char timechar[10];
+
+int nr; //number of records
 
 //conection related stuff
 byte mac[] = { 0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
@@ -107,12 +105,28 @@ void parse_header()
   char *next_token;
   char **rem;
   
-  next_token = strtok_r(report, ":",rem );
-  
-  String str(*rem);
-  if(str.substring(0)=="User-Agent")
+  Serial.println("Inside parse header");
+  for(next_token = strtok(report, ":\r\n"); next_token!=NULL; next_token=strtok(NULL, ":\r\n"))
   {
-    Serial.println("User agent");
+  
+     //Serial.println("Finished strtok");
+    
+    //Print token parsed
+    
+     Serial.print("Token parsed:");
+     Serial.println(next_token);
+     
+     
+    // String str = String(next_token);
+     
+   /* if((strcmp(next_token,"User-Agent"))==0)
+     {
+       Serial.println("Finally found user agent");
+      
+     //  record[nr].user_agent=String(strtok(NULL,"\r\n"));
+     //  Serial.println(record[nr].user_agent);
+     }
+ */
   }
   
 }
@@ -184,7 +198,7 @@ void loop()
                  
             } // client.available()
             Serial.println();
-    
+            ch=0;
     //prints the content stored in report
    /* 
      for(int i=0;i< ch;i++)
@@ -195,19 +209,17 @@ void loop()
      Serial.println();
      */ 
      
-     String request(report);
-     
-     if(request.substring(0,4) !="POST")
-     {
-       Serial.println("Not POST");
-     }
-     
-    // Serial.println("Parse Header");
-    
-     else
+     if(strstr(report, "POST")!=NULL)
      {
        Serial.println("Parsing Header...");
        parse_header();
+       
+     }
+    
+    
+     else
+     {
+       Serial.println("Not POST");
        
      }//Is a POST Request
        
