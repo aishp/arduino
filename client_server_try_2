@@ -172,15 +172,17 @@ void printDate(){
   Wire.requestFrom(DS1307_ADDRESS, 7);
 
   int second = bcdToDec(Wire.read());
-  int minute = bcdToDec(Wire.read());
+  int mi = bcdToDec(Wire.read()); 
   int hour = bcdToDec(Wire.read() & 0b111111); //24 hour time
   int weekDay = bcdToDec(Wire.read()); //0-6 -> sunday - Saturday
   int monthDay = bcdToDec(Wire.read());
   int month = bcdToDec(Wire.read());
   int year = bcdToDec(Wire.read());
-
+  
+  char  timechar[5];
+  
   //print the date EG   3/1/11 23:59:59
-  Serial.print(month);
+ /* Serial.print(month);
   Serial.print("/");
   Serial.print(monthDay);
   Serial.print("/");
@@ -188,57 +190,57 @@ void printDate(){
   Serial.print(" ");
   Serial.print(hour);
   Serial.print(":");
-  Serial.print(minute);
+  Serial.print(mi);
   Serial.print(":");
-  Serial.println(second);
-
-}
-void disp_time()
-{
-    tm=now();
-    dtostrf(tm,4,0,timechar);
- 
-     
-   // Serial.print("TIME = ");
-   // Serial.println(tm);
-   printDate();
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.write("Time:");
-    lcd.setCursor(7,0);
-    lcd.write(timechar);
-}
-
-void send_data()
-{
+  Serial.println(second);*/
   
-                Serial.println("Sending time data...");
-                client.println("PUT / HTTP/1.0");
-                client.println("Content-Type: application/json");
-                client.println("Connection: Keep-Alive");
-                client.println("Content-Length: 20");
-                client.println();
-                client.print("\"Time\":");
-                client.println(timechar);
-                client.println();
-                Serial.println("Time sent through telnet");
-                
-}
-/*
+ 
+  
+    
+    lcd.clear();
+    
+    lcd.setCursor(7,0);
+   
+  
+    dtostrf(monthDay,2,0,timechar);
+    lcd.setCursor(6,0);
+    lcd.write(timechar);
+   
+    
+    dtostrf(month,2,0,timechar);
+    lcd.setCursor(3,0);
+    lcd.write(timechar);
+    lcd.setCursor(5,0);
+    lcd.write("/");
+    
+    dtostrf(year,2,0,timechar);
+    lcd.setCursor(0,0);
+    lcd.write(timechar);
+    lcd.setCursor(2,0);
+    lcd.write("/");
+    
+    dtostrf(hour,2,0,timechar);
+    lcd.setCursor(0,1);
+    lcd.write(timechar);
+    lcd.setCursor(2,1);
+    lcd.write(":");
+    
+    dtostrf(mi,2,0,timechar);
+    lcd.setCursor(3,1);
+    lcd.write(timechar); 
+    lcd.setCursor(5,1);
+    lcd.write(":");
+    
+    dtostrf(second,2,0,timechar);
+    lcd.setCursor(6,1);
+    lcd.write(timechar);
 
-int conn()
-{
-    Serial.println("Conn");
-    connect_ret=client.connect(server_ip,8080);
-    Serial.print("Return from connect:");
-    Serial.println(connect_ret);
-    return connect_ret;
 }
-*/
+
 void loop()
 {
   Serial.flush();
-  disp_time();
+  printDate();
   
   //Serial.println("Loop");
   
@@ -289,11 +291,10 @@ void loop()
        
        
     }//if(client)
-    // client.stop();
-        //Serial.println("Client disconnected");
+    
         
         delay(1000);
-   // conn(); //send data 
+   
    
     
 } // end of loop1
