@@ -14,7 +14,8 @@
 //Content-Length: 70
 //{  "message": "Let's see if this works.",  "subject": "JSON via curl"}
 
-#include <EthernetV2_0.h>
+//#include <EthernetV2_0.h>
+#include <Ethernet.h>
 #include <SPI.h>
 #include "Time.h"
 #include <Wire.h>
@@ -66,8 +67,10 @@ EthernetServer server(80); //telnet defaults to this port
 void setup()  
 {
   
+  
     Serial.begin(9600);  // Used to type in characters
     delay(1000);
+    Serial.flush();
     Serial.println("Setup");
     //deselect SD card
     pinMode(SDCARD_CS,OUTPUT);
@@ -103,30 +106,48 @@ void setup()
 void parse_header()
 {
   char *next_token;
-  char **rem;
+ // char **rem;
   
   Serial.println("Inside parse header");
-  for(next_token = strtok(report, ":\r\n"); next_token!=NULL; next_token=strtok(NULL, ":\r\n"))
+  
+  next_token = strtok(report, " :\r\n");
+  
+  while(next_token!=NULL) 
   {
   
-     //Serial.println("Finished strtok");
     
-    //Print token parsed
-    
-     Serial.print("Token parsed:");
-     Serial.println(next_token);
-     
+   while(*next_token==' ')
+   {
+     next_token++;
+   }  
+   Serial.println(next_token);
+   
      
     // String str = String(next_token);
      
-   /* if((strcmp(next_token,"User-Agent"))==0)
+   if((strcmp(next_token,"User-Agent"))==0)
      {
-       Serial.println("Finally found user agent");
+       
+       //Serial.println("Finally found user agent");
       
-     //  record[nr].user_agent=String(strtok(NULL,"\r\n"));
+      record[nr].user_agent=String(strtok(NULL,"\r\n"));
+      //Serial.print("Record[nr].user_agent:");
      //  Serial.println(record[nr].user_agent);
      }
- */
+     
+     else if((strcmp(next_token,"uuid"))==0)
+     {     
+      record[nr].uuid=String(strtok(NULL,"{} ,:\r\n"));
+      Serial.println(record[nr].uuid);
+     }
+     
+     else if((strcmp(next_token,"ReportResource"))==0)
+     {     
+      record[nr].ReportResource=String(strtok(NULL,"{} ,:\r\n"));
+     }
+     
+     next_token=strtok(NULL, "{} ,:\r\n");
+ 
   }
   
 }
@@ -136,8 +157,8 @@ void disp_time()
     dtostrf(tm,4,0,timechar);
  
      
-    Serial.print("TIME = ");
-    Serial.println(tm);
+   // Serial.print("TIME = ");
+   // Serial.println(tm);
    
     lcd.clear();
     lcd.setCursor(0,0);
@@ -174,6 +195,7 @@ int conn()
 */
 void loop()
 {
+  Serial.flush();
   disp_time();
   
   //Serial.println("Loop");
