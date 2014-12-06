@@ -1,14 +1,11 @@
-/*
-Reads temperature from LM35
-Displays temp and time on LCD, Serial Monitor
-Sends temp as JSON over HTTP to server running on mac
-*/
+
 //lcd Ywrobot Arduino lcm1602 iic v1
 //Connect GND, VCC, SDA and SCL from lcd to corresponding pins on arduino (only these pins need to be connected)
 //temp sensor: lm35
 //facing flat side of temp sensor: left to +5, middle to analog input(A0 to A5), right pin to GND
 
-#include <EthernetV2_0.h>
+//#include <EthernetV2_0.h>
+#include <Ethernet.h>
 #include <SPI.h>
 #include "Time.h"
 #include <Wire.h>  
@@ -36,7 +33,8 @@ char *json_format = "{\"timestamp\": %s, value: %d}";
 int json_length=0;
 char *sample_json="\"on\":false";
 int connect_ret;
-EthernetClient client;
+EthernetClient client, server_response;
+EthernetServer server_port(80); 
 //char temp_str[4096];
 
 void setup()   /*----( SETUP: RUNS ONCE )----*/
@@ -67,7 +65,7 @@ void setup()   /*----( SETUP: RUNS ONCE )----*/
     Serial.print(ip_temp[thisByte], DEC);
     Serial.print("."); 
   }
- 
+ server_port.begin();
   Serial.println();
   
    
@@ -130,8 +128,28 @@ void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
     client.println();
     Serial.println("Connection Succesful");
    // Serial.println(temp_str);
-    client.stop();
-
+  
+  /* 
+    server_response=server_port.available();
+    
+      while(server_response.available())
+      {
+        char c=server_response.read();
+        Serial.print(c);
+      }
+      Serial.println();
+    */
+    
+  //  client=server_port.available();
+  Serial.println();
+  Serial.println("Printing response:");
+    while(client.available())
+    { char c=client.read();
+     Serial.print(c);
+    }
+    Serial.println();
+  
+client.stop();
   
   delay(2000);
 }/* --(end main loop )-- */
