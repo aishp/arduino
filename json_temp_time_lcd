@@ -12,15 +12,18 @@
 #include <LiquidCrystal_I2C.h> // download library if not available
 #include<stdio.h>
 #include<stdlib.h>
+#include "Wire.h"
+#define DS1307_ADDRESS 0x68
 
 #define SDCARD_CS 4
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 float temp;
-time_t tm;
-int tempPin=1;//corresponds to a2, 0 corresponds to a1
+int tempPin=3;  //corresponds to a3
 char tempchar[10];
-char timechar[10];
+
+
+byte zero = 0x00; //workaround for issue #527
 
 //conection related stuff
 byte mac[] = { 0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
@@ -37,9 +40,22 @@ EthernetClient client, server_response;
 EthernetServer server_port(80); 
 //char temp_str[4096];
 
+int sec;
+int mi;; 
+int hr; //24 hour time
+int weekDay; //0-6 -> sunday - Saturday
+int monthDay;
+int mnth;
+int yr;
+
+char report[400];
+int ch=0;
+
 void setup()   /*----( SETUP: RUNS ONCE )----*/
 {
   //deselect SD card
+  
+  Wire.begin();
   pinMode(SDCARD_CS,OUTPUT);
   digitalWrite(SDCARD_CS,HIGH);//Deselect the SD card
   
@@ -55,21 +71,107 @@ void setup()   /*----( SETUP: RUNS ONCE )----*/
  {
    Serial.println("Unable to assign IP using DHCP"); 
    Ethernet.begin(mac, ip, gateway, subnet);
- 
- 
- 
   Serial.print("My IP address: ");
   ip_temp = Ethernet.localIP();
-  for (byte thisByte = 0; thisByte < 4; thisByte++) {
+  for (byte thisByte = 0; thisByte < 4; thisByte++) 
+  {
     // print the value of each byte of the IP address:
     Serial.print(ip_temp[thisByte], DEC);
     Serial.print("."); 
   }
  server_port.begin();
-  Serial.println();
-  
-   
+  Serial.println(); 
+ }
 }
+
+
+
+byte bcdToDec(byte val)  {
+// Convert binary coded decimal to normal decimal numbers
+  return ( (val/16*10) + (val%16) );
+}
+
+
+void printDate(){
+
+  // Reset the register pointer
+  Wire.beginTransmission(DS1307_ADDRESS);
+  Wire.write(zero);
+  Wire.endTransmission();
+
+  Wire.requestFrom(DS1307_ADDRESS, 7);
+
+  sec = bcdToDec(Wire.read());
+  mi = bcdToDec(Wire.read()); 
+  hr = bcdToDec(Wire.read() & 0b111111); //24 hour time
+  weekDay = bcdToDec(Wire.read()); //0-6 -> sunday - Saturday
+  monthDay = bcdToDec(Wire.read());
+  mnth = bcdToDec(Wire.read());
+  yr = bcdToDec(Wire.read());
+  
+  char  timechar[5];
+  
+  //print the date EG   3/1/11 23:59:59
+ /* 
+  Serial.print(month);
+  Serial.print("/");
+  Serial.print(monthDay);
+  Serial.print("/");
+  Serial.print(year);
+  Serial.print(" ");
+  Serial.print(hour);
+  Serial.print(":");
+  Serial.print(mi);
+  Serial.print(":");
+  Serial.println(second);*/
+  
+ 
+  
+    
+    lcd.clear();
+    
+    /*
+    lcd.setCursor(7,0);
+    dtostrf(monthDay,2,0,timechar);
+    lcd.setCursor(6,0);
+    lcd.write(timechar);
+   
+    
+    dtostrf(month,2,0,timechar);
+    lcd.setCursor(3,0);
+    lcd.write(timechar);
+    lcd.setCursor(5,0);
+    lcd.write("/");
+    
+    dtostrf(year,2,0,timechar);
+    lcd.setCursor(0,0);
+    lcd.write(timechar);
+    lcd.setCursor(2,0);
+    lcd.write("/");
+    
+    */
+       
+    dtostrf(hr,2,0,timechar);
+    lcd.setCursor(0,0);
+    lcd.write(timechar);
+    lcd.setCursor(2,0);
+    lcd.write(":");
+    
+    dtostrf(mi,2,0,timechar);
+    lcd.setCursor(3,0);
+    lcd.write(timechar); 
+    lcd.setCursor(5,0);
+    lcd.write(":");
+    
+    dtostrf(sec,2,0,timechar);
+    lcd.setCursor(6,0);
+    lcd.write(timechar);
+    
+    lcd.setCursor(0,1);
+    lcd.write("Temp:");
+    lcd.setCursor(6,1);
+    lcd.write(tempchar);
+
 }
 
 int conn()
@@ -83,74 +185,75 @@ return connect_ret;
 
 void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
 {
-  temp = analogRead(tempPin);
-  tm=now();
-  temp = temp * 0.48828125;
-  dtostrf(temp,4,3,tempchar);//4- num of digits, 3- precision
-  dtostrf(tm,4,0,timechar);
-  Serial.print("TEMPERATURE = ");
   
-  Serial.print(temp);
-  Serial.print("*C");
-  Serial.println();
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.write("Temp:");
-  lcd.setCursor(7,0);
-  lcd.write(tempchar);
-   lcd.setCursor(0,1);
-  lcd.write("Time:");
-  lcd.setCursor(7,1);
-  lcd.write(timechar);
+  //read temperature and calibrate
+  temp = analogRead(tempPin);
+  float tempC = (((temp * 0.004882)-0.50)*100)-3;
+  dtostrf(tempC,4,3,tempchar);//4- num of digits, 3- precision
+  
+  //call printdate() to write to LCD
+  printDate();
   
   //connect to server
- 
+ /*
   while(conn()!=1)
    {
      Serial.println("Connection failed. Trying again...");
-     delay(1000);
-     
+     delay(1000); 
    }
-  // sprintf(temp_str, "Hello %f",temp);
-    json_length=20;
+ */
+ if(conn()==1)
+   {
+    json_length=200;
     client.println("PUT / HTTP/1.0");
     client.println("Content-Type: application/json");
     client.println("Connection: Keep-Alive");
-   client.print("Content-Length: ");
-   client.println(json_length);
+    client.print("Content-Length: ");
+    client.println(json_length);
     client.println();
-   //client.print("{\"Time\":");
-  //  client.print(timechar);
- //   client.print(",");
+    
+    client.println("{");
+    client.print("{\"Date\":");
+    client.print(yr);
+    client.print("/");
+    client.print(mnth);
+    client.print("/");
+    client.print(monthDay);
+    client.println(",");
+    
+    client.print("{\"Time\":");
+    client.print(hr);
+    client.print(":");
+    client.print(mi);
+    client.print("/");
+    client.print(sec);
+    client.println(",");
+       
     client.print("\"Temperature\":");
     client.println(tempchar);
-  // client.println("}");
+    client.println("}");
+    
     client.println();
     Serial.println("Connection Succesful");
    // Serial.println(temp_str);
   
-  /* 
-    server_response=server_port.available();
-    
-      while(server_response.available())
-      {
-        char c=server_response.read();
-        Serial.print(c);
-      }
-      Serial.println();
-    */
-    
-  //  client=server_port.available();
   Serial.println();
   Serial.println("Printing response:");
+   
     while(client.available())
-    { char c=client.read();
-     Serial.print(c);
+    { 
+      char c=client.read();
+      Serial.print(c);
     }
     Serial.println();
   
-client.stop();
-  
-  delay(2000);
+  client.stop();
+   }
+   
+   else
+   {
+     Serial.println("Connection failed. Trying again...");
+   }
+  delay(1000);
 }/* --(end main loop )-- */
 
