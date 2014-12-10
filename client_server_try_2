@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "Wire.h"
+//#include "RTClib.h"
 #define DS1307_ADDRESS 0x68
 
 
@@ -57,6 +58,18 @@ char timechar[10];
 
 int nr; //number of records
 
+
+int sec;
+int mi;; 
+int hr; //24 hour time
+int weekDay; //0-6 -> sunday - Saturday
+int monthDay;
+int mnth;
+int yr;
+
+char reply[200];
+int r=0;
+
 //conection related stuff
 byte mac[] = { 0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
 byte ip[]      = { 192, 168,   1,  199 };
@@ -66,7 +79,7 @@ IPAddress server_ip(192,168,1,33);
 IPAddress ip_temp;
 int connect_ret;
 EthernetClient client;
-EthernetServer server(80); //telnet defaults to this port
+EthernetServer server(80); 
 
 
 void setup()  
@@ -106,8 +119,98 @@ void setup()
         }
         
         Serial.println();
+        
+        printDate();
+        zone_connect();  
 }
 
+
+int conn()
+{
+connect_ret=client.connect(server_ip,8080);
+Serial.print("Return from connect:");
+Serial.println(connect_ret);
+return connect_ret;
+}
+
+void zone_connect() //function to establish contact with the Zone Controller
+{
+  while (conn()!=1);
+   
+    //create JSON Object
+    
+    String buf= String("{\"UUID\":");
+    String s1 = String("\"ab7ce619-80a9-11e4-ba18-28cfe91cf4ef\",");
+    buf=buf+s1;
+    s1=String("\"Name\": \"");
+    buf=buf+s1;
+    s1= String("Economizer\",");
+    buf=buf+s1;
+    s1=String("\"Date\": \"");
+    buf=buf+s1;
+    s1= String(yr,DEC);
+    buf=buf+s1;
+    s1="/";
+    buf=buf+s1;
+    s1=String(mnth,DEC);
+    buf=buf+s1;
+     s1="/";
+    buf=buf+s1;
+    s1=String(monthDay,DEC);
+    buf=buf+s1;
+    s1="\", \"Time\": \"";
+    buf=buf+s1;
+    s1= String(hr,DEC);
+    buf=buf+s1;
+    s1=":";
+    buf=buf+s1;
+    s1=String(mi,DEC);
+    buf=buf+s1;
+     s1=":";
+    buf=buf+s1;
+    s1=String(sec,DEC);
+    buf=buf+s1;
+    s1="\"}";
+    buf=buf+s1;
+    
+    
+    Serial.println("Connection Established with Zone Controller:");
+    //see if JSON object format is proper
+    Serial.println(buf);
+    int len=buf.length();
+    //start sending client data
+    client.println("POST /actuators HTTP/1.0");
+    client.println("Content-Type: application/json");
+    client.println("Connection: Keep-Alive");
+    client.print("Content-Length: ");
+    client.println(len);
+    client.println();
+    
+  
+    
+   client.println(buf);
+   
+    
+    Serial.println("Connection Succesful");
+  
+  Serial.println();
+ /*
+  Serial.println("Printing response:");
+   
+    while(client.available())
+    { 
+      reply[r]=client.read();
+      reply[r+1]='\0';
+      r++;
+      
+    }
+    r=0;
+    Serial.println(reply);
+  */
+  client.stop();
+   
+   
+}
 void parse_header()
 {
   char *next_token;
@@ -115,7 +218,7 @@ void parse_header()
   
   Serial.println("Inside parse header");
   
-  next_token = strtok(report, " :\r\n");
+  next_token = strtok(report, "\" :\r\n");
   
   while(next_token!=NULL) 
   {
@@ -125,33 +228,35 @@ void parse_header()
    {
      next_token++;
    }  
-   Serial.println(next_token);
+   //Serial.println(next_token);
    
      
     // String str = String(next_token);
      
-   if((strcmp(next_token,"User-Agent"))==0)
+   if((strcmp(next_token,"Hour"))==0)
      {
        
-       //Serial.println("Finally found user agent");
-      
-      record[nr].user_agent=String(strtok(NULL,"\r\n"));
+       
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      Serial.print("The hour is:");
+      Serial.println(next_token);
+     // record[nr].user_agent=String(strtok(NULL,"\r\n"));
       //Serial.print("Record[nr].user_agent:");
      //  Serial.println(record[nr].user_agent);
      }
      
      else if((strcmp(next_token,"uuid"))==0)
      {     
-      record[nr].uuid=String(strtok(NULL,"{} ,:\r\n"));
-      Serial.println(record[nr].uuid);
+      //record[nr].uuid=String(strtok(NULL,"{} ,:\r\n"));
+      //Serial.println(record[nr].uuid);
      }
      
      else if((strcmp(next_token,"ReportResource"))==0)
      {     
-      record[nr].ReportResource=String(strtok(NULL,"{} ,:\r\n"));
+      //record[nr].ReportResource=String(strtok(NULL,"{}\" ,:\r\n"));
      }
      
-     next_token=strtok(NULL, "{} ,:\r\n");
+     next_token=strtok(NULL, "{}\" ,:\r\n");
  
   }
   
@@ -171,13 +276,13 @@ void printDate(){
 
   Wire.requestFrom(DS1307_ADDRESS, 7);
 
-  int second = bcdToDec(Wire.read());
-  int mi = bcdToDec(Wire.read()); 
-  int hour = bcdToDec(Wire.read() & 0b111111); //24 hour time
-  int weekDay = bcdToDec(Wire.read()); //0-6 -> sunday - Saturday
-  int monthDay = bcdToDec(Wire.read());
-  int month = bcdToDec(Wire.read());
-  int year = bcdToDec(Wire.read());
+  sec = bcdToDec(Wire.read());
+  mi = bcdToDec(Wire.read()); 
+  hr = bcdToDec(Wire.read() & 0b111111); //24 hour time
+  weekDay = bcdToDec(Wire.read()); //0-6 -> sunday - Saturday
+  monthDay = bcdToDec(Wire.read());
+  mnth = bcdToDec(Wire.read());
+  yr = bcdToDec(Wire.read());
   
   char  timechar[5];
   
@@ -207,19 +312,19 @@ void printDate(){
     lcd.write(timechar);
    
     
-    dtostrf(month,2,0,timechar);
+    dtostrf(mnth,2,0,timechar);
     lcd.setCursor(3,0);
     lcd.write(timechar);
     lcd.setCursor(5,0);
     lcd.write("/");
     
-    dtostrf(year,2,0,timechar);
+    dtostrf(yr,2,0,timechar);
     lcd.setCursor(0,0);
     lcd.write(timechar);
     lcd.setCursor(2,0);
     lcd.write("/");
     
-    dtostrf(hour,2,0,timechar);
+    dtostrf(hr,2,0,timechar);
     lcd.setCursor(0,1);
     lcd.write(timechar);
     lcd.setCursor(2,1);
@@ -231,7 +336,7 @@ void printDate(){
     lcd.setCursor(5,1);
     lcd.write(":");
     
-    dtostrf(second,2,0,timechar);
+    dtostrf(sec,2,0,timechar);
     lcd.setCursor(6,1);
     lcd.write(timechar);
 
@@ -265,6 +370,8 @@ void loop()
             } // client.available()
             Serial.println();
             ch=0;
+            
+            client.println("HTTP/1.1 200 OK");
     //prints the content stored in report
    /* 
      for(int i=0;i< ch;i++)
