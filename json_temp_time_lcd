@@ -21,7 +21,8 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I
 float temp;
 int tempPin=3;  //corresponds to a3
 char tempchar[10];
-
+char reply[200];
+int r=0;
 
 byte zero = 0x00; //workaround for issue #527
 
@@ -205,8 +206,17 @@ void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
  if(conn()==1)
    {
     //create JSON Object
-    String buf = String("{\"Date\": \"");
-    String s1= String(yr,DEC);
+    
+    String buf= String("{\"UUID\":");
+    String s1 = String("\"ce3757c2-8010-11e4-af03-28cfe91cf4ef\",");
+    buf=buf+s1;
+    s1=String("\"Name\": \"");
+    buf=buf+s1;
+    s1= String("Room\",");
+    buf=buf+s1;
+    s1=String("\"Date\": \"");
+    buf=buf+s1;
+    s1= String(yr,DEC);
     buf=buf+s1;
     s1="/";
     buf=buf+s1;
@@ -241,7 +251,7 @@ void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
     Serial.println(buf);
     int len=buf.length();
     //start sending client data
-    client.println("PUT / HTTP/1.0");
+    client.println("POST /sensor_data HTTP/1.0");
     client.println("Content-Type: application/json");
     client.println("Connection: Keep-Alive");
     client.print("Content-Length: ");
@@ -284,10 +294,13 @@ void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
    
     while(client.available())
     { 
-      char c=client.read();
-      Serial.print(c);
+      reply[r]=client.read();
+      reply[r+1]='\0';
+      r++;
+      
     }
-    Serial.println();
+    
+    Serial.println(reply);
   
   client.stop();
    }
