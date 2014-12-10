@@ -204,36 +204,78 @@ void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
  */
  if(conn()==1)
    {
-    json_length=200;
+    //create JSON Object
+    String buf = String("{\"Date\": \"");
+    String s1= String(yr,DEC);
+    buf=buf+s1;
+    s1="/";
+    buf=buf+s1;
+    s1=String(mnth,DEC);
+    buf=buf+s1;
+     s1="/";
+    buf=buf+s1;
+    s1=String(monthDay,DEC);
+    buf=buf+s1;
+    s1="\", \"Time\": \"";
+    buf=buf+s1;
+    s1= String(hr,DEC);
+    buf=buf+s1;
+    s1=":";
+    buf=buf+s1;
+    s1=String(mi,DEC);
+    buf=buf+s1;
+     s1=":";
+    buf=buf+s1;
+    s1=String(sec,DEC);
+    buf=buf+s1;
+    s1="\", \"Temperature\": \"";
+    buf=buf+s1;
+    s1=String(tempchar);
+    buf=buf+s1;
+    s1="\"}";
+    buf=buf+s1;
+    
+    
+    
+    //see if JSON object format is proper
+    Serial.println(buf);
+    int len=buf.length();
+    //start sending client data
     client.println("PUT / HTTP/1.0");
     client.println("Content-Type: application/json");
     client.println("Connection: Keep-Alive");
     client.print("Content-Length: ");
-    client.println(json_length);
+    client.println(len);
     client.println();
     
-    client.println("{");
-    client.print("{\"Date\":");
+    
+    /*
+   // client.println("{");
+    client.print("{\"Date\":\"");
     client.print(yr);
     client.print("/");
     client.print(mnth);
     client.print("/");
     client.print(monthDay);
-    client.println(",");
+    client.print("\",");
     
-    client.print("{\"Time\":");
+    client.print("\"Time\":\"");
     client.print(hr);
     client.print(":");
     client.print(mi);
-    client.print("/");
+    client.print(":");
     client.print(sec);
-    client.println(",");
-       
-    client.print("\"Temperature\":");
-    client.println(tempchar);
-    client.println("}");
+    client.print("\",");
+         
+    client.print("\"Temperature\": \"");
+    client.print(tempC);
+    client.print("\"}");
+    */
     
-    client.println();
+   client.println(buf);
+    //client.println();
+    //client.println("\"Date\":\" 12\"");
+    
     Serial.println("Connection Succesful");
    // Serial.println(temp_str);
   
