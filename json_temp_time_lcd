@@ -1,48 +1,11 @@
-Skip to content
- This repository
-Explore
-Gist
-Blog
-Help
-Aishwarya Parasuram aishp
- 
-3  Unwatch 
-  Star 0
- Fork 0aishp/arduino
-arduino/   or cancel
- Edit file   Preview changes      
+//lcd Ywrobot Arduino lcm1602 iic v1
+//Connect GND, VCC, SDA and SCL from lcd to corresponding pins on arduino (only these pins need to be connected)
+//temp sensor: lm35
+//facing flat side of temp sensor: left to +5, middle to analog input(A0 to A5), right pin to GND
 
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
 //#include <EthernetV2_0.h>
+
+//response from zoneController: {"Hour": 16, "Month": 12, "Second": 9, "Year": 14, "Day": 13, "Minute": 22}
 #include <Ethernet.h>
 #include <SPI.h>
 #include "Time.h"
@@ -52,23 +15,336 @@ arduino/   or cancel
 #include<stdlib.h>
 #include "Wire.h"
 #define DS1307_ADDRESS 0x68
+
 #define SDCARD_CS 4
+
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 float temp;
 int tempPin=3;  //corresponds to a3
 char tempchar[10];
-char reply[200];
-int r=0;
+char reply[200]; //reply from zoneController with time in json packet
+int r=0; //index of reply
+
 byte zero = 0x00; //workaround for issue #527
+
 //conection related stuff
 byte mac[] = { 0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
 byte ip[]      = { 192, 168,   1,  199 }; 
 byte gateway[] = { 192, 168,   1,  1 };   
 byte subnet[]  = { 255, 255, 255,   0 };   
 IPAddress server(192,168,1,33);
-Aishwarya Parasuram
-Commit changes
+IPAddress ip_temp;
+char *json_format = "{\"timestamp\": %s, value: %d}";
+int json_length=0;
+char *sample_json="\"on\":false";
+int connect_ret;
+EthernetClient client, server_response;
+EthernetServer server_port(80); 
+//char temp_str[4096];
 
-Commit changes  Cancel
-Status API Training Shop Blog About
-© 2014 GitHub, Inc. Terms Privacy Security Contact
+int sec, sec_u;
+int mi, mi_u; 
+int hr, hr_u; //24 hour time
+int weekDay; //0-6 -> sunday - Saturday
+int monthDay, monthDay_u;
+int mnth, mnth_u;
+int yr, yr_u;
+
+char report[400];
+int ch=0;
+
+void setup()   /*----( SETUP: RUNS ONCE )----*/
+{
+  //deselect SD card
+  
+  Wire.begin();
+  pinMode(SDCARD_CS,OUTPUT);
+  digitalWrite(SDCARD_CS,HIGH);//Deselect the SD card
+  
+  Serial.begin(9600);  // Used to type in characters
+  delay(1000);
+  
+  lcd.begin(16,2);   // initialize the lcd for 16 chars 2 lines, turn on backlight
+  lcd.clear();
+  
+ // Ethernet.begin(mac);
+ 
+  if(Ethernet.begin(mac)==0)
+ {
+   Serial.println("Unable to assign IP using DHCP"); 
+   Ethernet.begin(mac, ip, gateway, subnet);
+  Serial.print("My IP address: ");
+  ip_temp = Ethernet.localIP();
+  for (byte thisByte = 0; thisByte < 4; thisByte++) 
+  {
+    // print the value of each byte of the IP address:
+    Serial.print(ip_temp[thisByte], DEC);
+    Serial.print("."); 
+  }
+ server_port.begin();
+  Serial.println(); 
+ }
+}
+
+
+
+byte bcdToDec(byte val)  {
+// Convert binary coded decimal to normal decimal numbers
+  return ( (val/16*10) + (val%16) );
+}
+
+
+void printDate(){
+
+  // Reset the register pointer
+  Wire.beginTransmission(DS1307_ADDRESS);
+  Wire.write(zero);
+  Wire.endTransmission();
+
+  Wire.requestFrom(DS1307_ADDRESS, 7);
+
+  sec = bcdToDec(Wire.read());
+  mi = bcdToDec(Wire.read()); 
+  hr = bcdToDec(Wire.read() & 0b111111); //24 hour time
+  weekDay = bcdToDec(Wire.read()); //0-6 -> sunday - Saturday
+  monthDay = bcdToDec(Wire.read());
+  mnth = bcdToDec(Wire.read());
+  yr = bcdToDec(Wire.read());
+  
+    char  timechar[5];
+  
+    lcd.clear();
+    
+    dtostrf(hr,2,0,timechar);
+    lcd.setCursor(0,0);
+    lcd.write(timechar);
+    lcd.setCursor(2,0);
+    lcd.write(":");
+    
+    dtostrf(mi,2,0,timechar);
+    lcd.setCursor(3,0);
+    lcd.write(timechar); 
+    lcd.setCursor(5,0);
+    lcd.write(":");
+    
+    dtostrf(sec,2,0,timechar);
+    lcd.setCursor(6,0);
+    lcd.write(timechar);
+    
+    lcd.setCursor(0,1);
+    lcd.write("Temp:");
+    lcd.setCursor(6,1);
+    lcd.write(tempchar);
+
+}
+
+int conn()
+{
+  connect_ret=client.connect(server,8080);
+Serial.print("Return from connect:");
+Serial.println(connect_ret);
+return connect_ret;
+}
+
+
+byte decToBcd(byte val)
+
+{
+// Convert normal decimal numbers to binary coded decimal
+  return ( (val/10*16) + (val%10) );
+}
+
+void update_time()
+{
+
+  Wire.beginTransmission(DS1307_ADDRESS);
+  Wire.write(zero); //stop Oscillator
+
+  Wire.write(decToBcd(sec_u));
+  Wire.write(decToBcd(mi_u));
+  Wire.write(decToBcd(hr_u));
+  Wire.write(decToBcd(weekDay));
+  Wire.write(decToBcd(monthDay_u));
+  Wire.write(decToBcd(mnth_u));
+  Wire.write(decToBcd(yr_u));
+
+  Wire.write(zero); //start 
+
+  Wire.endTransmission();
+
+}
+void parse_header()
+{
+  char *next_token;
+ // char **rem;
+  
+  Serial.println("Inside parse header");
+  
+  next_token = strtok(reply, "\" :\r\n");
+  
+  while(next_token!=NULL) 
+  {
+
+    //pass spaces
+   while(*next_token==' ')
+   {
+     next_token++;
+   }  
+  
+   if((strcmp(next_token,"Hour"))==0)
+     {
+       
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      hr_u=atoi(next_token);
+      
+      Serial.print("The hour is:");
+      Serial.println(next_token);
+     // record[nr].user_agent=String(strtok(NULL,"\r\n"));
+      //Serial.print("Record[nr].user_agent:");
+     //  Serial.println(record[nr].user_agent);
+     }
+     
+     else if((strcmp(next_token,"Minute"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      mi_u=atoi(next_token);
+     }
+     
+      else if((strcmp(next_token,"Second"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      sec_u=atoi(next_token);
+     }
+     
+      else if((strcmp(next_token,"Year"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      yr_u=atoi(next_token);
+     }
+     
+      else if((strcmp(next_token,"Month"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      mnth_u=atoi(next_token);
+     }
+     
+       else if((strcmp(next_token,"Day"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      monthDay_u=atoi(next_token);
+     }
+     
+     next_token=strtok(NULL, "{}\" ,:\r\n");
+ 
+  }
+  
+  update_time();
+  
+}
+
+
+void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
+{
+  
+  //read temperature and calibrate
+  temp = analogRead(tempPin);
+  float tempC = (((temp * 0.004882)-0.50)*100)-3;
+  dtostrf(tempC,4,3,tempchar);//4- num of digits, 3- precision
+  
+  //call printdate() to write to LCD
+  printDate();
+  
+  //connect to server
+ /*
+  while(conn()!=1)
+   {
+     Serial.println("Connection failed. Trying again...");
+     delay(1000); 
+   }
+ */
+ if(conn()==1)
+   {
+    //create JSON Object
+    
+    String buf= String("{\"UUID\":");
+    String s1 = String("\"ce3757c2-8010-11e4-af03-28cfe91cf4ef\",");
+    buf=buf+s1;
+    s1=String("\"Name\": \"");
+    buf=buf+s1;
+    s1= String("Room\",");
+    buf=buf+s1;
+    s1=String("\"Date\": \"");
+    buf=buf+s1;
+    s1= String(yr,DEC);
+    buf=buf+s1;
+    s1="/";
+    buf=buf+s1;
+    s1=String(mnth,DEC);
+    buf=buf+s1;
+     s1="/";
+    buf=buf+s1;
+    s1=String(monthDay,DEC);
+    buf=buf+s1;
+    s1="\", \"Time\": \"";
+    buf=buf+s1;
+    s1= String(hr,DEC);
+    buf=buf+s1;
+    s1=":";
+    buf=buf+s1;
+    s1=String(mi,DEC);
+    buf=buf+s1;
+     s1=":";
+    buf=buf+s1;
+    s1=String(sec,DEC);
+    buf=buf+s1;
+    s1="\", \"Temperature\": \"";
+    buf=buf+s1;
+    s1=String(tempchar);
+    buf=buf+s1;
+    s1="\"}";
+    buf=buf+s1;
+    
+    
+    
+    //see if JSON object format is proper
+    Serial.println(buf);
+    int len=buf.length();
+    //start sending client data
+    client.println("POST /sensor_data HTTP/1.0");
+    client.println("Content-Type: application/json");
+    client.println("Connection: Keep-Alive");
+    client.print("Content-Length: ");
+    client.println(len);
+    client.println();
+    
+   client.println(buf);
+    //client.println();
+    //client.println("\"Date\":\" 12\"");
+    
+    Serial.println("Connection Succesful");
+   // Serial.println(temp_str);
+  
+  Serial.println();
+  Serial.println("Printing response:");
+   
+    while(client.available())
+    { 
+      reply[r]=client.read();
+      reply[r+1]='\0';
+      r++;
+      
+    }
+    r=0;
+    parse_header();
+    String rep=String(reply);
+    Serial.println(rep);
+  
+  client.stop();
+   }
+   
+   else
+   {
+     Serial.println("Connection failed. Trying again...");
+   }
+  delay(1000);
+}/* --(end main loop )-- */
