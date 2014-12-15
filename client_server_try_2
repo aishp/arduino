@@ -59,13 +59,13 @@ char timechar[10];
 int nr; //number of records
 
 
-int sec;
-int mi;; 
-int hr; //24 hour time
+int sec, sec_u;
+int mi,mi_u; 
+int hr, hr_u; //24 hour time
 int weekDay; //0-6 -> sunday - Saturday
-int monthDay;
-int mnth;
-int yr;
+int monthDay, monthDay_u;
+int mnth, mnth_u;
+int yr, yr_u;
 
 char reply[200];
 int r=0;
@@ -211,6 +211,36 @@ void zone_connect() //function to establish contact with the Zone Controller
    
    
 }
+
+
+byte decToBcd(byte val)
+
+{
+// Convert normal decimal numbers to binary coded decimal
+  return ( (val/10*16) + (val%10) );
+}
+
+
+void update_time()
+{
+
+  Wire.beginTransmission(DS1307_ADDRESS);
+  Wire.write(zero); //stop Oscillator
+
+  Wire.write(decToBcd(sec_u));
+  Wire.write(decToBcd(mi_u));
+  Wire.write(decToBcd(hr_u));
+  Wire.write(decToBcd(weekDay));
+  Wire.write(decToBcd(monthDay_u));
+  Wire.write(decToBcd(mnth_u));
+  Wire.write(decToBcd(yr_u));
+
+  Wire.write(zero); //start 
+
+  Wire.endTransmission();
+
+}
+
 void parse_header()
 {
   char *next_token;
@@ -236,8 +266,9 @@ void parse_header()
    if((strcmp(next_token,"Hour"))==0)
      {
        
-       
       next_token=strtok(NULL, "{}\" ,:\r\n");
+      hr_u=atoi(next_token);
+      
       Serial.print("The hour is:");
       Serial.println(next_token);
      // record[nr].user_agent=String(strtok(NULL,"\r\n"));
@@ -245,20 +276,41 @@ void parse_header()
      //  Serial.println(record[nr].user_agent);
      }
      
-     else if((strcmp(next_token,"uuid"))==0)
-     {     
-      //record[nr].uuid=String(strtok(NULL,"{} ,:\r\n"));
-      //Serial.println(record[nr].uuid);
+     else if((strcmp(next_token,"Minute"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      mi_u=atoi(next_token);
      }
      
-     else if((strcmp(next_token,"ReportResource"))==0)
-     {     
-      //record[nr].ReportResource=String(strtok(NULL,"{}\" ,:\r\n"));
+      else if((strcmp(next_token,"Second"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      sec_u=atoi(next_token);
+     }
+     
+      else if((strcmp(next_token,"Year"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      yr_u=atoi(next_token);
+     }
+     
+      else if((strcmp(next_token,"Month"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      mnth_u=atoi(next_token);
+     }
+     
+       else if((strcmp(next_token,"Day"))==0)
+     {
+      next_token=strtok(NULL, "{}\" ,:\r\n");
+      monthDay_u=atoi(next_token);
      }
      
      next_token=strtok(NULL, "{}\" ,:\r\n");
  
   }
+  
+  update_time();
   
 }
 
@@ -369,9 +421,11 @@ void loop()
                  
             } // client.available()
             Serial.println();
+            Serial.println("Received from zone Controller");
+            Serial.println(report);
             ch=0;
             
-            client.println("HTTP/1.1 200 OK");
+            client.println("HTTP/1.0 200 OK");
     //prints the content stored in report
    /* 
      for(int i=0;i< ch;i++)
