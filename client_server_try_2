@@ -30,8 +30,12 @@ int sig=0;
 //define led's
 int e0=12;
 int e1=11;
-int e2=10;
+int e2=13;
+int e3=9;
+int e4=8;
 
+
+int flag=0;
 
 #define SDCARD_CS 4
 //#define ledPin 13
@@ -77,8 +81,8 @@ char reply[500];
 int r=0;
 
 //conection related stuff
-byte mac[] = { 0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
-byte ip[]      = { 192, 168,   1,  199 };
+byte mac[] = { 0x68, 0x67, 0x32, 0x3B, 0x76, 0xFC };
+byte ip[]      = { 192, 168,   1,  191 };
 byte gateway[] = { 192, 168,   1,  1 };
 byte subnet[]  = { 255, 255, 255,   0 };
 IPAddress server_ip(192,168,1,34);
@@ -109,12 +113,9 @@ void setup()
     lcd.clear();
    
     
-    if(Ethernet.begin(mac)==0)
-    {
-        Serial.println("Unable to assign IP using DHCP");
+   
         Ethernet.begin(mac, ip, gateway, subnet);
-        
-    }
+   
     
     server.begin();
         
@@ -155,7 +156,7 @@ void zone_connect() //function to establish contact with the Zone Controller
     buf=buf+s1;
     s1=String("\"Name\": \"");
     buf=buf+s1;
-    s1= String("Economizer\",");
+    s1= String("HVAC\",");
     buf=buf+s1;
     s1=String("\"Date\": \"");
     buf=buf+s1;
@@ -334,6 +335,8 @@ void parse_header()
      {
       next_token=strtok(NULL, "{}\" ,:\r\n");
       sig=atoi(next_token);
+       Serial.print("The signal is:");
+      Serial.println(sig);
      }
      
      next_token=strtok(NULL, "{}\" ,:\r\n");
@@ -346,25 +349,58 @@ void parse_header()
 
 void actuate()
 {
+  if(flag==1)
+  {
+  Serial.println("In actuate");
   if(sig==0)
   {
+    Serial.println("Signal=0");
     digitalWrite(e0, HIGH);
     digitalWrite(e1, LOW);
     digitalWrite(e2, LOW);
+    digitalWrite(e3, LOW);
+    digitalWrite(e4, LOW);
   }
   
   else if (sig==1)
   {
+    Serial.println("Signal=1");
     digitalWrite(e0, HIGH);
     digitalWrite(e1, HIGH);
     digitalWrite(e2, LOW);
+    digitalWrite(e3, LOW);
+    digitalWrite(e4, LOW);
   }
   
   else if (sig==2)
   {
+    Serial.println("Signal=2");
     digitalWrite(e0, HIGH);
     digitalWrite(e1, HIGH);
     digitalWrite(e2, HIGH);
+    digitalWrite(e3, LOW);
+    digitalWrite(e4, LOW);
+  }
+  
+   else if (sig==2)
+  {
+    Serial.println("Signal=2");
+    digitalWrite(e0, HIGH);
+    digitalWrite(e1, HIGH);
+    digitalWrite(e2, HIGH);
+    digitalWrite(e3, HIGH);
+    digitalWrite(e4, LOW);
+  }
+  
+   else if (sig==2)
+  {
+    Serial.println("Signal=2");
+    digitalWrite(e0, HIGH);
+    digitalWrite(e1, HIGH);
+    digitalWrite(e2, HIGH);
+    digitalWrite(e3, HIGH);
+    digitalWrite(e4, HIGH);
+  }
   }
   
 }
@@ -497,13 +533,32 @@ void loop()
        Serial.println("Parsing Header...");
        parse_header();
        
-       if(sec%4==3)
+       Serial.print("After parse_header(), printing sec:");
+       Serial.print(sec);
+      
+       if(((sec_u%10)==0 || (sec_u%10)==1) && flag==0)
        {
+         flag=1;
+         Serial.println("Going to actuate");
          actuate();
        }
        
+      else if((sec_u%10)>5)
+     {
+       flag=0;
+       Serial.println("Switching off LED's");
+      digitalWrite(e0, LOW);
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, LOW);
+      
      }
     
+       
+     }
+     
+     
     
      else
      {
