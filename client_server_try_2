@@ -14,8 +14,8 @@
 //Content-Length: 70
 //{  "message": "Let's see if this works.",  "subject": "JSON via curl"}
 
-//#include <EthernetV2_0.h>
 #include <Ethernet.h>
+//#include <Ethernet.h>
 #include <SPI.h>
 #include "Time.h"
 #include <Wire.h>
@@ -82,7 +82,9 @@ int r=0;
 
 //conection related stuff
 byte mac[] = { 0x68, 0x67, 0x32, 0x3B, 0x76, 0xFC };
+//byte mac[] = { 0x68, 0x67, 0x32, 0x3B, 0x76, 0xFC };
 byte ip[]      = { 192, 168,   1,  191 };
+//byte ip[]      = { 192, 168,   1,  191 };
 byte gateway[] = { 192, 168,   1,  1 };
 byte subnet[]  = { 255, 255, 255,   0 };
 IPAddress server_ip(192,168,1,34);
@@ -105,9 +107,11 @@ void setup()
     digitalWrite(SDCARD_CS,HIGH);//Deselect the SD card
     
     //initialize LED's
+    pinMode(13, OUTPUT);
     pinMode(12, OUTPUT);
     pinMode(11, OUTPUT);
-    pinMode(10, OUTPUT);
+    pinMode(9, OUTPUT);
+    pinMode(8, OUTPUT);
     
     lcd.begin(16,2);   // initialize the lcd for 16 chars 2 lines, turn on backlight
     lcd.clear();
@@ -157,6 +161,7 @@ void zone_connect() //function to establish contact with the Zone Controller
     s1=String("\"Name\": \"");
     buf=buf+s1;
     s1= String("HVAC\",");
+    
     buf=buf+s1;
     s1=String("\"Date\": \"");
     buf=buf+s1;
@@ -293,6 +298,7 @@ void parse_header()
        
       next_token=strtok(NULL, "{}\" ,:\r\n");
       hr_u=atoi(next_token);
+      hr=hr_u;
       
       Serial.print("The hour is:");
       Serial.println(next_token);
@@ -305,12 +311,14 @@ void parse_header()
      {
       next_token=strtok(NULL, "{}\" ,:\r\n");
       mi_u=atoi(next_token);
+      mi=mi_u;
      }
      
       else if((strcmp(next_token,"Second"))==0)
      {
       next_token=strtok(NULL, "{}\" ,:\r\n");
       sec_u=atoi(next_token);
+      sec=sec_u;
      }
      
       else if((strcmp(next_token,"Year"))==0)
@@ -323,12 +331,14 @@ void parse_header()
      {
       next_token=strtok(NULL, "{}\" ,:\r\n");
       mnth_u=atoi(next_token);
+      mnth=mnth_u;
      }
      
        else if((strcmp(next_token,"Day"))==0)
      {
       next_token=strtok(NULL, "{}\" ,:\r\n");
       monthDay_u=atoi(next_token);
+      monthDay=monthDay_u;
      }
      
       else if((strcmp(next_token,"Signal"))==0)
@@ -360,6 +370,7 @@ void actuate()
     digitalWrite(e2, LOW);
     digitalWrite(e3, LOW);
     digitalWrite(e4, LOW);
+    
   }
   
   else if (sig==1)
@@ -382,9 +393,9 @@ void actuate()
     digitalWrite(e4, LOW);
   }
   
-   else if (sig==2)
+   else if (sig==-1)
   {
-    Serial.println("Signal=2");
+    Serial.println("Signal=-1");
     digitalWrite(e0, HIGH);
     digitalWrite(e1, HIGH);
     digitalWrite(e2, HIGH);
@@ -392,9 +403,9 @@ void actuate()
     digitalWrite(e4, LOW);
   }
   
-   else if (sig==2)
+   else if (sig==-2)
   {
-    Serial.println("Signal=2");
+    Serial.println("Signal=-2");
     digitalWrite(e0, HIGH);
     digitalWrite(e1, HIGH);
     digitalWrite(e2, HIGH);
@@ -491,6 +502,24 @@ void loop()
   Serial.flush();
   printDate();
   
+  
+    if(((sec%10)==0 || (sec%10)==1) && flag==0)
+       {
+         flag=1;
+         Serial.println("Going to actuate");
+         actuate();
+       }
+       
+      else if((sec%10)>5)
+     {
+       flag=0;
+       Serial.println("Switching off LED's");
+      digitalWrite(e0, LOW);
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, LOW);
+     }
   //Serial.println("Loop");
   
   
@@ -536,30 +565,10 @@ void loop()
        Serial.print("After parse_header(), printing sec:");
        Serial.print(sec);
       
-       if(((sec_u%10)==0 || (sec_u%10)==1) && flag==0)
-       {
-         flag=1;
-         Serial.println("Going to actuate");
-         actuate();
-       }
-       
-      else if((sec_u%10)>5)
-     {
-       flag=0;
-       Serial.println("Switching off LED's");
-      digitalWrite(e0, LOW);
-      digitalWrite(e1, LOW);
-      digitalWrite(e2, LOW);
-      digitalWrite(e3, LOW);
-      digitalWrite(e4, LOW);
       
-     }
-    
        
      }
      
-     
-    
      else
      {
        Serial.println("Not POST");
@@ -567,11 +576,13 @@ void loop()
      }//Is a POST Request
        
        
+    
     }//if(client)
     
         
-        delay(1000);
+        
    
-   
+     
+     delay(1000);
     
 } // end of loop1
